@@ -1,0 +1,58 @@
+
+#create Docker host with docker-machine
+docker-machine create -d virtualbox node-1
+docker-machine create -d virtualbox node-2
+docke
+
+docker-machine ls
+
+#access to node-1
+eval $(docker-machine env node-1)
+
+docker swarm init \
+    --advertise-addr $(docker-machine ip node-1) \
+    --listen-addr $(docker-machine ip node-1):2377
+
+#check token (run on manager node)
+docker swarm join-token -q worker
+
+#join swarm cluster (node-2,node-3)
+
+eval $(docker-machine env node-2)
+docker swarm join \
+    --token SWMTKN-1-1jznj3d3xzm8iatplw18lsx16s606nurjmdwl1g25pyrla79yy-6j70ju49cxsqn018qnixti1zy \
+    $(docker-machine ip node-1):2377
+
+eval $(docker-machine env node-3)
+docker swarm join \
+    --token SWMTKN-1-1jznj3d3xzm8iatplw18lsx16s606nurjmdwl1g25pyrla79yy-6j70ju49cxsqn018qnixti1zy \
+    $(docker-machine ip node-1):2377
+
+
+#create overlay network
+docker network create --driver overlay putter-network
+
+#show network driver
+docker network ls
+
+#create service
+docker service create --name web-proxy \
+  -p 8000:80 
+  --network putter-network \
+  smebberson/alpine-nginx
+
+#show service
+docker service ls
+docker service inspect web-proxy
+
+#scale Application
+docker service scale web-proxy=5
+
+docker service ls
+docker service ps web-proxy
+
+#promote manager
+docker node promote node-2
+
+
+
